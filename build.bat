@@ -10,7 +10,7 @@ if %errorlevel%==0 (
         echo Failed to compile resources.
         exit /b 1
     )
-    g++ -O3 -s -std=c++17 main.cpp processing.cpp resource.o -o TextTools.exe -mwindows -lcomctl32 -lole32 -luuid -ldwmapi -luxtheme
+    g++ -O3 -s -static -std=c++17 main.cpp processing.cpp resource.o -o TextTools.exe -mwindows -lcomctl32 -lole32 -luuid -ldwmapi -luxtheme
     if %errorlevel% neq 0 (
         echo Compilation failed.
         exit /b 1
