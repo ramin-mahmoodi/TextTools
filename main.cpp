@@ -29,11 +29,12 @@
 #define ID_EDIT_SPLIT 112
 #define ID_BTN_SORT 113
 #define ID_COMBO_SORT 114
+#define ID_BTN_SCRAPE 115
 
 // Global Variables
 HWND hMainWnd;
 HWND hListView;
-HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnExtract, hBtnSplit, hBtnSort;
+HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnExtract, hBtnSplit, hBtnSort;
 HWND hEditDomain, hEditSplit, hComboSort;
 HWND hProgressBar;
 HWND hChkSelectAll;
@@ -181,6 +182,7 @@ void SetUIState(bool enabled) {
     EnableWindow(hBtnCombine, enabled);
     EnableWindow(hBtnDedupe, enabled);
     EnableWindow(hBtnClean, enabled);
+    EnableWindow(hBtnScrape, enabled);
     EnableWindow(hBtnExtract, enabled);
     EnableWindow(hEditDomain, enabled);
     EnableWindow(hBtnSplit, enabled);
@@ -514,6 +516,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_CLEAN, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnClean, WM_SETFONT, (WPARAM)hFont, TRUE);
 
+            hBtnScrape = CreateWindowW(L"BUTTON", L"Raw Scrape", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SCRAPE, GetModuleHandle(NULL), NULL);
+            SendMessage(hBtnScrape, WM_SETFONT, (WPARAM)hFont, TRUE);
+
             hEditDomain = CreateWindowExW(0, L"EDIT", L"gmail.com", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE,
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_DOMAIN, GetModuleHandle(NULL), NULL);
             SendMessage(hEditDomain, WM_SETFONT, (WPARAM)hFont, TRUE);
@@ -550,6 +556,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SetWindowSubclass(hBtnCombine, ButtonSubclassProc, 3, 0);
             SetWindowSubclass(hBtnDedupe, ButtonSubclassProc, 4, 0);
             SetWindowSubclass(hBtnClean, ButtonSubclassProc, 5, 0);
+            SetWindowSubclass(hBtnScrape, ButtonSubclassProc, 12, 0);
             SetWindowSubclass(hBtnExtract, ButtonSubclassProc, 6, 0);
             SetWindowSubclass(hEditDomain, EditSubclassProc, 7, 0);
             SetWindowSubclass(hEditSplit, EditSubclassProc, 8, 0);
@@ -755,7 +762,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int panelInnerWidth = width - 2 * padding - 2 * innerPadding;
             int maxCols = std::max(1, (panelInnerWidth + spacing) / (btnW + spacing));
             int cols = std::min(5, maxCols);
-            int numBtns = 5;
+            int numBtns = 6;
             int rows = (numBtns + cols - 1) / cols;
 
             // The total height of the control panel including buttons, separator, extract, split, sort, and progress
@@ -800,7 +807,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int actualBtnW = (panelInnerWidth - (cols - 1) * spacing) / cols;
             if (actualBtnW < btnW) actualBtnW = btnW;
 
-            HWND btns[] = {hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean};
+            HWND btns[] = {hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape};
             for (int i = 0; i < numBtns; ++i) {
                 int c = i % cols;
                 int r = i / cols;
@@ -930,3 +937,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
+
+
+
+
+
+

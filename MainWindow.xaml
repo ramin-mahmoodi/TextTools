@@ -1,0 +1,49 @@
+﻿<Window x:Class="TextTools.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TextTools"
+        mc:Ignorable="d"
+        Title="Text Tools" Height="200" Width="480" ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen" Icon="/Logo_txt.ico">
+    <Window.Style>
+        <Style TargetType="Window" BasedOn="{StaticResource {x:Type Window}}"/>
+    </Window.Style>
+    <Grid Margin="10">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="30*"/>
+                    <RowDefinition Height="30*"/>
+                    <RowDefinition Height="20*"/>
+                    <RowDefinition Height="20*"/>
+                </Grid.RowDefinitions>
+                <Button x:Name="btn_selectfolder" Focusable="False" Margin="5" Content="Select Files..." Grid.Row="0" Click="btn_selectfolder_Click"/>
+                <Button x:Name="btn_combine" Focusable="False" Margin="5" Content="Combine Files" Grid.Row="1" Click="btn_combine_Click"/>
+                <TextBlock x:Name="txt_selectedfiles" FontSize="11" VerticalAlignment="Center" Margin="5" TextWrapping="NoWrap" Text="Selected Files:" Grid.Row="2"/>
+                <TextBlock x:Name="txt_numberfiles" FontSize="11" VerticalAlignment="Center" Margin="5" TextWrapping="NoWrap" Text="Number Of Files:" Grid.Row="3"/>
+
+
+            </Grid>
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="30*"/>
+                    <RowDefinition Height="30*"/>
+                    <RowDefinition Height="20*"/>
+                    <RowDefinition Height="20*"/>
+                </Grid.RowDefinitions>
+                <Button x:Name="btn_opentextfile" Focusable="False" Margin="5" Content="Open File..." Grid.Row="0" Click="btn_opentextfile_Click"/>
+                <Button x:Name="btn_remove" Focusable="False" Margin="5" Content="Remove Duplicate Lines" Grid.Row="1" Click="btn_remove_Click"/>
+                <TextBlock x:Name="txt_selectedfile" FontSize="11" VerticalAlignment="Center" Margin="5" TextWrapping="NoWrap" Text="Selected File:" Grid.Row="2"/>
+                <TextBlock x:Name="txt_numberline" FontSize="11" VerticalAlignment="Center" Margin="5" TextWrapping="NoWrap" Text="Number Of Lines:" Grid.Row="3"/>
+
+
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

@@ -37,3 +37,7 @@ void StartSplitTask(TaskContext* context);
 
 // Start a thread to sort files
 void StartSortTask(TaskContext* context);
+
+// Start a thread to scrape from dump
+void StartScrapeTask(TaskContext* context);
+

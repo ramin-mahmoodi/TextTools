@@ -492,3 +492,76 @@ void StartSortTask(TaskContext* context) {
     t.detach();
 }
 
+void ScrapeThread(TaskContext* context) {
+    long long totalSize = 0;
+    for (const auto& file : context->inputFiles) {
+        totalSize += GetFileSizeW(file);
+    }
+    if (totalSize == 0) {
+        PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
+        return;
+    }
+    std::ofstream out(context->outputFile.c_str(), std::ios::binary);
+    if (!out) {
+        PostMessage(context->hwndMain, WM_WORKER_FINISHED, 0, 0);
+        return;
+    }
+    long long processedSize = 0;
+    int lastPercent = -1;
+    size_t matchesFound = 0;
+    for (const auto& file : context->inputFiles) {
+        std::ifstream in(file.c_str(), std::ios::binary);
+        if (!in) continue;
+        std::vector<char> ioBuffer(1024 * 1024);
+        in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
+        std::string line;
+        while (std::getline(in, line)) {
+            if (context->cancelRequested) {
+                out.close();
+                DeleteFileW(context->outputFile.c_str());
+                PostMessage(context->hwndMain, WM_WORKER_FINISHED, 0, 0);
+                return;
+            }
+            processedSize += line.length() + 1;
+            
+            size_t startPos = 0;
+            while (startPos < line.length()) {
+                size_t colonPos = line.find(':', startPos);
+                if (colonPos == std::string::npos) break;
+                
+                size_t atPos = line.rfind('@', colonPos);
+                if (atPos != std::string::npos && atPos >= startPos && atPos < colonPos - 1) {
+                    size_t emailStart = atPos;
+                    while (emailStart > startPos && !isspace((unsigned char)line[emailStart - 1]) && line[emailStart - 1] != '|' && line[emailStart - 1] != '"' && line[emailStart - 1] != '\'') {
+                        emailStart--;
+                    }
+                    size_t passEnd = colonPos + 1;
+                    while (passEnd < line.length() && !isspace((unsigned char)line[passEnd]) && line[passEnd] != '|' && line[passEnd] != '"' && line[passEnd] != '\'') {
+                        passEnd++;
+                    }
+                    
+                    std::string combo = line.substr(emailStart, passEnd - emailStart);
+                    if (IsValidEmailPass(combo)) {
+                        out << combo << "\r\n";
+                        matchesFound++;
+                    }
+                }
+                startPos = colonPos + 1;
+            }
+
+            int percent = (int)((processedSize * 100) / totalSize);
+            if (percent != lastPercent) {
+                PostMessage(context->hwndMain, WM_WORKER_PROGRESS, percent, 0);
+                lastPercent = percent;
+            }
+        }
+    }
+    out.close();
+    std::wstring* msg = new std::wstring(L"Raw Scrape complete.\nCombos extracted: " + std::to_wstring(matchesFound));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
+}
+
+void StartScrapeTask(TaskContext* context) {
+    std::thread t(ScrapeThread, context);
+    t.detach();
+}
