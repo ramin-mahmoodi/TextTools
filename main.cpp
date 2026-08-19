@@ -215,7 +215,7 @@ void OnAddFiles() {
     ofn.hwndOwner = hMainWnd;
     ofn.lpstrFile = szFile;
     ofn.nMaxFile = sizeof(szFile) / sizeof(wchar_t);
-    ofn.lpstrFilter = L"Text Files\0*.txt;*.csv;*.log\0All Files\0*.*\0";
+    ofn.lpstrFilter = L"Supported Files\0*.txt;*.csv;*.log;*.sql;*.json\0All Files\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
@@ -937,6 +937,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
