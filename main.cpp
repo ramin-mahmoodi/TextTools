@@ -537,6 +537,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Alphabetical (Z-A)");
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Length (Shortest to Longest)");
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Length (Longest to Shortest)");
+            SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Randomize (Shuffle)");
             SendMessageW(hComboSort, CB_SETCURSEL, 0, 0);
             SetWindowTheme(hComboSort, L"", L"");
 
@@ -608,11 +609,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         case WM_WORKER_FINISHED: {
             SetUIState(true);
+            std::wstring* msg = (std::wstring*)lParam;
             if (wParam == 1) {
-                MessageBoxW(hwnd, L"Task completed successfully!", L"Success", MB_OK | MB_ICONINFORMATION);
+                if (msg) {
+                    MessageBoxW(hwnd, msg->c_str(), L"Success", MB_OK | MB_ICONINFORMATION);
+                } else {
+                    MessageBoxW(hwnd, L"Task completed successfully!", L"Success", MB_OK | MB_ICONINFORMATION);
+                }
             } else {
                 MessageBoxW(hwnd, L"Task failed or was cancelled.", L"Error", MB_OK | MB_ICONERROR);
             }
+            if (msg) delete msg;
             g_nProgress = 0;
             InvalidateRect(hProgressBar, NULL, TRUE);
             delete currentTask;

@@ -1,17 +1,38 @@
 #include "processing.h"
-#include <thread>
 #include <fstream>
 #include <unordered_set>
+#include <thread>
+#include <algorithm>
+#include <random>
 
-
-// Helper to get file size
-long long GetFileSizeW(const std::wstring& filename) {
-    HANDLE hFile = CreateFileW(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) return 0;
+long long GetFileSizeW(const std::wstring& path) {
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fad))
+        return 0;
     LARGE_INTEGER size;
-    if (!GetFileSizeEx(hFile, &size)) size.QuadPart = 0;
-    CloseHandle(hFile);
+    size.HighPart = fad.nFileSizeHigh;
+    size.LowPart = fad.nFileSizeLow;
     return size.QuadPart;
+}
+
+bool IsValidEmailPass(const std::string& line) {
+    size_t colonPos = line.find(':');
+    if (colonPos == std::string::npos || colonPos == 0 || colonPos == line.length() - 1) return false;
+    
+    // Check if email has @ and .
+    std::string email = line.substr(0, colonPos);
+    if (email.find('@') == std::string::npos || email.find('.') == std::string::npos) return false;
+    
+    // Check if password has at least one non-whitespace character
+    std::string pass = line.substr(colonPos + 1);
+    bool hasChar = false;
+    for (char c : pass) {
+        if (!isspace((unsigned char)c)) {
+            hasChar = true;
+            break;
+        }
+    }
+    return hasChar;
 }
 
 void CombineThread(TaskContext* context) {
@@ -31,46 +52,49 @@ void CombineThread(TaskContext* context) {
         return;
     }
 
-    const size_t bufferSize = 1024 * 1024; // 1MB buffer
-    std::vector<char> buffer(bufferSize);
     long long processedSize = 0;
     int lastPercent = -1;
+    size_t totalLines = 0;
 
     for (const auto& file : context->inputFiles) {
         std::ifstream in(file.c_str(), std::ios::binary);
         if (!in) continue;
-
-        while (in.read(buffer.data(), bufferSize) || in.gcount() > 0) {
+        
+        std::vector<char> ioBuffer(1024 * 1024);
+        in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
+        
+        std::string line;
+        while (std::getline(in, line)) {
             if (context->cancelRequested) {
                 out.close();
                 DeleteFileW(context->outputFile.c_str());
                 PostMessage(context->hwndMain, WM_WORKER_FINISHED, 0, 0);
                 return;
             }
-            size_t bytes = in.gcount();
-            out.write(buffer.data(), bytes);
-            processedSize += bytes;
+            processedSize += line.length() + 1;
 
-            int percent = static_cast<int>((processedSize * 100) / totalSize);
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+            out << line << "\r\n";
+            totalLines++;
+
+            int percent = (int)((processedSize * 100) / totalSize);
             if (percent != lastPercent) {
-                lastPercent = percent;
                 PostMessage(context->hwndMain, WM_WORKER_PROGRESS, percent, 0);
+                lastPercent = percent;
             }
         }
     }
     
     out.close();
-    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
+    std::wstring* msg = new std::wstring(L"Combined successfully.\nTotal lines: " + std::to_wstring(totalLines));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
 }
 
-// 64-bit FNV-1a hash for memory efficient deduplication
-uint64_t HashString64(const std::string& str) {
-    uint64_t hash = 14695981039346656037ULL;
-    for (char c : str) {
-        hash ^= static_cast<uint64_t>(c);
-        hash *= 1099511628211ULL;
-    }
-    return hash;
+void StartCombineTask(TaskContext* context) {
+    std::thread t(CombineThread, context);
+    t.detach();
 }
 
 void RemoveDuplicatesThread(TaskContext* context) {
@@ -90,20 +114,22 @@ void RemoveDuplicatesThread(TaskContext* context) {
         return;
     }
 
-    // Using uint64_t hash set to save massive amounts of RAM for multi-GB files.
-    std::unordered_set<uint64_t> seenHashes;
+    std::unordered_set<std::string> seen;
+    seen.reserve(totalSize / 30); // Approximate lines based on average 30 chars
+
     long long processedSize = 0;
     int lastPercent = -1;
-    std::string line;
+    size_t originalLines = 0;
+    size_t duplicatesRemoved = 0;
 
     for (const auto& file : context->inputFiles) {
         std::ifstream in(file.c_str(), std::ios::binary);
         if (!in) continue;
         
-        // Use a larger buffer for ifstream
         std::vector<char> ioBuffer(1024 * 1024);
         in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
-
+        
+        std::string line;
         while (std::getline(in, line)) {
             if (context->cancelRequested) {
                 out.close();
@@ -111,62 +137,35 @@ void RemoveDuplicatesThread(TaskContext* context) {
                 PostMessage(context->hwndMain, WM_WORKER_FINISHED, 0, 0);
                 return;
             }
-            processedSize += line.length() + 1; // approximation for progress
+            processedSize += line.length() + 1;
+            originalLines++;
 
-            // Trim carriage return if present
-            std::string actualLine = line;
-            if (!actualLine.empty() && actualLine.back() == '\r') {
-                actualLine.pop_back();
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
             }
 
-            uint64_t hash = HashString64(actualLine);
-            if (seenHashes.find(hash) == seenHashes.end()) {
-                seenHashes.insert(hash);
-                out << line << "\n";
+            if (seen.insert(line).second) {
+                out << line << "\r\n";
+            } else {
+                duplicatesRemoved++;
             }
 
-            int percent = static_cast<int>((processedSize * 100) / totalSize);
-            if (percent > 100) percent = 100;
+            int percent = (int)((processedSize * 100) / totalSize);
             if (percent != lastPercent) {
-                lastPercent = percent;
                 PostMessage(context->hwndMain, WM_WORKER_PROGRESS, percent, 0);
+                lastPercent = percent;
             }
         }
     }
 
     out.close();
-    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
-}
-
-void StartCombineTask(TaskContext* context) {
-    std::thread t(CombineThread, context);
-    t.detach();
+    std::wstring* msg = new std::wstring(L"Deduplication complete.\nOriginal lines: " + std::to_wstring(originalLines) + L"\nDuplicates removed: " + std::to_wstring(duplicatesRemoved) + L"\nFinal lines: " + std::to_wstring(originalLines - duplicatesRemoved));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
 }
 
 void StartRemoveDuplicatesTask(TaskContext* context) {
     std::thread t(RemoveDuplicatesThread, context);
     t.detach();
-}
-
-bool IsValidEmailPass(const std::string& line) {
-    size_t colonPos = line.find(':');
-    if (colonPos == std::string::npos || colonPos == 0 || colonPos == line.length() - 1) return false;
-    
-    size_t atPos = line.find('@');
-    if (atPos == std::string::npos || atPos >= colonPos || atPos == 0 || atPos == colonPos - 1) return false;
-    
-    size_t dotPos = line.rfind('.', colonPos);
-    if (dotPos == std::string::npos || dotPos < atPos || dotPos == colonPos - 1 || dotPos == atPos + 1) return false;
-
-    bool hasPassword = false;
-    for (size_t i = colonPos + 1; i < line.length(); ++i) {
-        if (line[i] != ' ' && line[i] != '\t' && line[i] != '\r' && line[i] != '\n') {
-            hasPassword = true;
-            break;
-        }
-    }
-    
-    return hasPassword;
 }
 
 void CleanThread(TaskContext* context) {
@@ -188,7 +187,8 @@ void CleanThread(TaskContext* context) {
 
     long long processedSize = 0;
     int lastPercent = -1;
-    std::string line;
+    size_t originalLines = 0;
+    size_t invalidLines = 0;
 
     for (const auto& file : context->inputFiles) {
         std::ifstream in(file.c_str(), std::ios::binary);
@@ -196,7 +196,8 @@ void CleanThread(TaskContext* context) {
         
         std::vector<char> ioBuffer(1024 * 1024);
         in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
-
+        
+        std::string line;
         while (std::getline(in, line)) {
             if (context->cancelRequested) {
                 out.close();
@@ -205,6 +206,7 @@ void CleanThread(TaskContext* context) {
                 return;
             }
             processedSize += line.length() + 1;
+            originalLines++;
 
             if (!line.empty() && line.back() == '\r') {
                 line.pop_back();
@@ -212,6 +214,8 @@ void CleanThread(TaskContext* context) {
 
             if (IsValidEmailPass(line)) {
                 out << line << "\r\n";
+            } else {
+                invalidLines++;
             }
 
             int percent = (int)((processedSize * 100) / totalSize);
@@ -223,7 +227,8 @@ void CleanThread(TaskContext* context) {
     }
 
     out.close();
-    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
+    std::wstring* msg = new std::wstring(L"Clean complete.\nOriginal lines: " + std::to_wstring(originalLines) + L"\nInvalid removed: " + std::to_wstring(invalidLines) + L"\nFinal valid lines: " + std::to_wstring(originalLines - invalidLines));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
 }
 
 void StartCleanTask(TaskContext* context) {
@@ -250,7 +255,8 @@ void ExtractThread(TaskContext* context) {
 
     long long processedSize = 0;
     int lastPercent = -1;
-    std::string line;
+    size_t processedLines = 0;
+    size_t matchesFound = 0;
     
     std::string targetDomain = context->filterDomain;
     if (!targetDomain.empty() && targetDomain[0] != '@') {
@@ -264,6 +270,7 @@ void ExtractThread(TaskContext* context) {
         std::vector<char> ioBuffer(1024 * 1024);
         in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
 
+        std::string line;
         while (std::getline(in, line)) {
             if (context->cancelRequested) {
                 out.close();
@@ -272,6 +279,7 @@ void ExtractThread(TaskContext* context) {
                 return;
             }
             processedSize += line.length() + 1;
+            processedLines++;
 
             if (!line.empty() && line.back() == '\r') {
                 line.pop_back();
@@ -279,6 +287,7 @@ void ExtractThread(TaskContext* context) {
 
             if (line.find(targetDomain) != std::string::npos && IsValidEmailPass(line)) {
                 out << line << "\r\n";
+                matchesFound++;
             }
 
             int percent = (int)((processedSize * 100) / totalSize);
@@ -290,7 +299,8 @@ void ExtractThread(TaskContext* context) {
     }
 
     out.close();
-    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
+    std::wstring* msg = new std::wstring(L"Extraction complete.\nLines processed: " + std::to_wstring(processedLines) + L"\nMatches found: " + std::to_wstring(matchesFound));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
 }
 
 void StartExtractTask(TaskContext* context) {
@@ -311,9 +321,8 @@ void SplitThread(TaskContext* context) {
 
     long long processedSize = 0;
     int lastPercent = -1;
-    std::string line;
+    size_t totalLinesWritten = 0;
     
-    // Find base name and extension of outputFile
     std::wstring basePath = context->outputFile;
     std::wstring ext = L"";
     size_t dotPos = basePath.rfind(L'.');
@@ -333,6 +342,7 @@ void SplitThread(TaskContext* context) {
         std::vector<char> ioBuffer(1024 * 1024);
         in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
 
+        std::string line;
         while (std::getline(in, line)) {
             if (context->cancelRequested) {
                 if (out.is_open()) out.close();
@@ -353,6 +363,7 @@ void SplitThread(TaskContext* context) {
 
             out << line << "\r\n";
             currentLineCount++;
+            totalLinesWritten++;
 
             if (currentLineCount >= context->splitLines) {
                 out.close();
@@ -369,15 +380,16 @@ void SplitThread(TaskContext* context) {
     }
 
     if (out.is_open()) out.close();
-    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
+    
+    int finalParts = (currentLineCount == 0) ? (partNumber - 1) : partNumber;
+    std::wstring* msg = new std::wstring(L"Split complete.\nTotal parts: " + std::to_wstring(finalParts) + L"\nTotal lines written: " + std::to_wstring(totalLinesWritten));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
 }
 
 void StartSplitTask(TaskContext* context) {
     std::thread t(SplitThread, context);
     t.detach();
 }
-
-#include <algorithm>
 
 void SortThread(TaskContext* context) {
     long long totalSize = 0;
@@ -391,14 +403,12 @@ void SortThread(TaskContext* context) {
     }
 
     std::vector<std::string> lines;
-    // Pre-allocate to save time, assuming ~30 bytes per line
     lines.reserve(totalSize / 30);
     
     long long processedSize = 0;
     int lastPercent = -1;
     std::string line;
 
-    // Step 1: Read all files
     for (const auto& file : context->inputFiles) {
         std::ifstream in(file.c_str(), std::ios::binary);
         if (!in) continue;
@@ -420,7 +430,7 @@ void SortThread(TaskContext* context) {
                 lines.push_back(line);
             }
             
-            int percent = (int)((processedSize * 50) / totalSize); // First 50% is reading
+            int percent = (int)((processedSize * 50) / totalSize); 
             if (percent != lastPercent) {
                 PostMessage(context->hwndMain, WM_WORKER_PROGRESS, percent, 0);
                 lastPercent = percent;
@@ -428,33 +438,30 @@ void SortThread(TaskContext* context) {
         }
     }
 
-    // Step 2: Sort
     if (context->sortMode == 0) {
-        // Alphabetical A-Z
         std::sort(lines.begin(), lines.end());
     } else if (context->sortMode == 1) {
-        // Alphabetical Z-A
         std::sort(lines.begin(), lines.end(), [](const std::string& a, const std::string& b) {
             return a > b;
         });
     } else if (context->sortMode == 2) {
-        // Length Shortest to Longest
         std::sort(lines.begin(), lines.end(), [](const std::string& a, const std::string& b) {
             if (a.length() != b.length()) return a.length() < b.length();
-            return a < b; // Fallback to alphabetical if same length
+            return a < b;
         });
     } else if (context->sortMode == 3) {
-        // Length Longest to Shortest
         std::sort(lines.begin(), lines.end(), [](const std::string& a, const std::string& b) {
             if (a.length() != b.length()) return a.length() > b.length();
             return a < b;
         });
+    } else if (context->sortMode == 4) {
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(lines.begin(), lines.end(), g);
     }
 
-    // Sort is 75% point
     PostMessage(context->hwndMain, WM_WORKER_PROGRESS, 75, 0);
 
-    // Step 3: Write out
     std::ofstream out(context->outputFile.c_str(), std::ios::binary);
     std::vector<char> ioBuffer(1024 * 1024);
     out.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
@@ -476,10 +483,12 @@ void SortThread(TaskContext* context) {
         }
     }
 
-    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, 0);
+    std::wstring* msg = new std::wstring(L"Operation complete.\nTotal lines: " + std::to_wstring(totalLines));
+    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 1, (LPARAM)msg);
 }
 
 void StartSortTask(TaskContext* context) {
     std::thread t(SortThread, context);
     t.detach();
 }
+
