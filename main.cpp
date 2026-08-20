@@ -44,56 +44,59 @@ HWND hChkSelectAll;
 TaskContext* currentTask = nullptr;
 int g_nProgress = 0;
 
-LRESULT CALLBACK ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
-    if (uMsg == WM_NOTIFY) {
-        LPNMHDR nmhdr = (LPNMHDR)lParam;
-        if (nmhdr->code == NM_CUSTOMDRAW) {
-            LPNMCUSTOMDRAW nmcd = (LPNMCUSTOMDRAW)lParam;
-            if (nmhdr->hwndFrom == (HWND)SendMessage(hWnd, LVM_GETHEADER, 0, 0)) {
-                if (nmcd->dwDrawStage == CDDS_PREPAINT) {
-                    HDC hdc = nmcd->hdc;
-                    RECT rc;
-                    GetClientRect(nmhdr->hwndFrom, &rc);
-                    
-                    HBRUSH hBrush = CreateSolidBrush(RGB(36, 36, 36));
-                    FillRect(hdc, &rc, hBrush);
-                    DeleteObject(hBrush);
-                    
-                    int count = SendMessage(nmhdr->hwndFrom, HDM_GETITEMCOUNT, 0, 0);
-                    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
-                    HGDIOBJ hOldPen = SelectObject(hdc, hPen);
-                    SetBkMode(hdc, TRANSPARENT);
-                    SetTextColor(hdc, RGB(240, 240, 240));
-                    
-                    for (int i = 0; i < count; i++) {
-                        RECT itemRc;
-                        SendMessage(nmhdr->hwndFrom, HDM_GETITEMRECT, i, (LPARAM)&itemRc);
-                        
-                        if (i > 0) {
-                            MoveToEx(hdc, itemRc.right - 1, itemRc.top + 4, NULL);
-                            LineTo(hdc, itemRc.right - 1, itemRc.bottom - 4);
-                        }
-                        
-                        wchar_t text[256] = {0};
-                        HDITEMW hdi = {0};
-                        hdi.mask = HDI_TEXT;
-                        hdi.pszText = text;
-                        hdi.cchTextMax = 256;
-                        SendMessage(nmhdr->hwndFrom, HDM_GETITEMW, i, (LPARAM)&hdi);
-                        
-                        RECT textRc = itemRc;
-                        textRc.left += 6;
-                        DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                    }
-                    SelectObject(hdc, hOldPen);
-                    DeleteObject(hPen);
-                    
-                    return CDRF_SKIPDEFAULT;
-                }
+LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
+    if (uMsg == WM_PAINT) {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+        
+        HBRUSH hBrush = CreateSolidBrush(RGB(36, 36, 36));
+        FillRect(hdc, &rc, hBrush);
+        DeleteObject(hBrush);
+        
+        int count = SendMessage(hWnd, HDM_GETITEMCOUNT, 0, 0);
+        HPEN hPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
+        HGDIOBJ hOldPen = SelectObject(hdc, hPen);
+        
+        HFONT hFont = (HFONT)SendMessage(GetParent(GetParent(hWnd)), WM_GETFONT, 0, 0); // Get font from main window
+        HGDIOBJ hOldFont = SelectObject(hdc, hFont);
+        
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(240, 240, 240));
+        
+        for (int i = 0; i < count; i++) {
+            RECT itemRc;
+            SendMessage(hWnd, HDM_GETITEMRECT, i, (LPARAM)&itemRc);
+            
+            if (i < count - 1) { // Draw separator for all but the last column
+                MoveToEx(hdc, itemRc.right - 1, itemRc.top + 4, NULL);
+                LineTo(hdc, itemRc.right - 1, itemRc.bottom - 4);
             }
+            
+            wchar_t text[256] = {0};
+            HDITEMW hdi = {0};
+            hdi.mask = HDI_TEXT;
+            hdi.pszText = text;
+            hdi.cchTextMax = 256;
+            SendMessage(hWnd, HDM_GETITEMW, i, (LPARAM)&hdi);
+            
+            RECT textRc = itemRc;
+            textRc.left += 6; // Fixed padding
+            DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         }
+        
+        SelectObject(hdc, hOldFont);
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hPen);
+        
+        EndPaint(hWnd, &ps);
+        return 0;
+    } else if (uMsg == WM_ERASEBKGND) {
+        return 1;
     } else if (uMsg == WM_NCDESTROY) {
-        RemoveWindowSubclass(hWnd, ListViewSubclassProc, uIdSubclass);
+        RemoveWindowSubclass(hWnd, HeaderSubclassProc, uIdSubclass);
     }
     return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
@@ -595,7 +598,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ListView_SetBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextColor(hListView, RGB(240, 240, 240));
-            SetWindowSubclass(hListView, ListViewSubclassProc, 3, 0);
+            SetWindowSubclass(ListView_GetHeader(hListView), HeaderSubclassProc, 4, 0);
 
             hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                 0, 0, 0, 0, ListView_GetHeader(hListView), (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
@@ -1085,6 +1088,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
