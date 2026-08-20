@@ -60,7 +60,7 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         HPEN hPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
         HGDIOBJ hOldPen = SelectObject(hdc, hPen);
         
-        HFONT hFont = (HFONT)SendMessage(GetParent(GetParent(hWnd)), WM_GETFONT, 0, 0); // Get font from main window
+        HFONT hFont = (HFONT)SendMessage(GetParent(hWnd), WM_GETFONT, 0, 0); // Get font from main window
         HGDIOBJ hOldFont = SelectObject(hdc, hFont);
         
         SetBkMode(hdc, TRANSPARENT);
@@ -93,6 +93,12 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         
         EndPaint(hWnd, &ps);
         return 0;
+    } else if (uMsg == WM_CTLCOLORSTATIC) {
+        static HBRUSH hbrStatic = CreateSolidBrush(RGB(36, 36, 36));
+        HDC hdcStatic = (HDC)wParam;
+        SetTextColor(hdcStatic, RGB(240, 240, 240));
+        SetBkColor(hdcStatic, RGB(36, 36, 36));
+        return (INT_PTR)hbrStatic;
     } else if (uMsg == WM_ERASEBKGND) {
         return 1;
     } else if (uMsg == WM_NCDESTROY) {
@@ -1088,6 +1094,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
