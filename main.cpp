@@ -39,10 +39,58 @@ HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnEx
 HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
 HWND hChkSelectAll;
-HWND hLblHeader, hLblSize, hLblLines;
+
 
 TaskContext* currentTask = nullptr;
 int g_nProgress = 0;
+
+LRESULT CALLBACK ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
+    if (uMsg == WM_NOTIFY) {
+        LPNMHDR nmhdr = (LPNMHDR)lParam;
+        if (nmhdr->code == NM_CUSTOMDRAW) {
+            LPNMCUSTOMDRAW nmcd = (LPNMCUSTOMDRAW)lParam;
+            if (nmhdr->hwndFrom == (HWND)SendMessage(hWnd, LVM_GETHEADER, 0, 0)) {
+                if (nmcd->dwDrawStage == CDDS_PREPAINT) {
+                    return CDRF_NOTIFYITEMDRAW;
+                }
+                if (nmcd->dwDrawStage == CDDS_ITEMPREPAINT) {
+                    HDC hdc = nmcd->hdc;
+                    RECT rc = nmcd->rc;
+                    
+                    HBRUSH hBrush = CreateSolidBrush(RGB(36, 36, 36));
+                    FillRect(hdc, &rc, hBrush);
+                    DeleteObject(hBrush);
+                    
+                    HPEN hPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
+                    HGDIOBJ hOldPen = SelectObject(hdc, hPen);
+                    MoveToEx(hdc, rc.right - 1, rc.top, NULL);
+                    LineTo(hdc, rc.right - 1, rc.bottom);
+                    SelectObject(hdc, hOldPen);
+                    DeleteObject(hPen);
+                    
+                    wchar_t text[256] = {0};
+                    HDITEMW hdi = {0};
+                    hdi.mask = HDI_TEXT;
+                    hdi.pszText = text;
+                    hdi.cchTextMax = 256;
+                    SendMessage(nmhdr->hwndFrom, HDM_GETITEMW, nmcd->dwItemSpec, (LPARAM)&hdi);
+                    
+                    SetBkMode(hdc, TRANSPARENT);
+                    SetTextColor(hdc, RGB(255, 255, 255));
+                    
+                    RECT textRc = rc;
+                    textRc.left += 6;
+                    DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                    
+                    return CDRF_SKIPDEFAULT;
+                }
+            }
+        }
+    } else if (uMsg == WM_NCDESTROY) {
+        RemoveWindowSubclass(hWnd, ListViewSubclassProc, uIdSubclass);
+    }
+    return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+}
 
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
     switch (uMsg) {
@@ -535,22 +583,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 0, 0, 0, 0, hwnd, (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
             SendMessage(hChkSelectAll, WM_SETFONT, (WPARAM)hFont, TRUE);
             
-            hLblHeader = CreateWindowExW(0, L"STATIC", L"File Path", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
-            SendMessage(hLblHeader, WM_SETFONT, (WPARAM)hFont, TRUE);
-            
-            hLblSize = CreateWindowExW(0, L"STATIC", L"Size", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
-            SendMessage(hLblSize, WM_SETFONT, (WPARAM)hFont, TRUE);
-            
-            hLblLines = CreateWindowExW(0, L"STATIC", L"Lines", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
-            SendMessage(hLblLines, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-
-
             hListView = CreateWindowExW(0, WC_LISTVIEWW, L"",
-                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_NOCOLUMNHEADER | LVS_SHOWSELALWAYS,
+                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
             SendMessage(hListView, WM_SETFONT, (WPARAM)hFont, TRUE);
             ListView_SetExtendedListViewStyle(hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
@@ -558,24 +592,29 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ListView_SetBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextColor(hListView, RGB(240, 240, 240));
+            SetWindowSubclass(hListView, ListViewSubclassProc, 3, 0);
 
             LVCOLUMNW lvc = {0};
-            lvc.mask = LVCF_WIDTH | LVCF_SUBITEM;
+            lvc.mask = LVCF_WIDTH | LVCF_SUBITEM | LVCF_TEXT;
             
             // Column 0: Checkbox
             lvc.cx = 30;
+            lvc.pszText = (LPWSTR)L"";
             ListView_InsertColumn(hListView, 0, &lvc);
             
             // Column 1: File Path
             lvc.cx = 500;
+            lvc.pszText = (LPWSTR)L"File Path";
             ListView_InsertColumn(hListView, 1, &lvc);
 
             // Column 2: Size
             lvc.cx = 100;
+            lvc.pszText = (LPWSTR)L"Size";
             ListView_InsertColumn(hListView, 2, &lvc);
             
             // Column 3: Lines
             lvc.cx = 100;
+            lvc.pszText = (LPWSTR)L"Lines";
             ListView_InsertColumn(hListView, 3, &lvc);
 
             hBtnAdd = CreateWindowW(L"BUTTON", L"Add Files", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
@@ -881,27 +920,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int linesColW = MulDiv(100, dpi, 96);
             int scrollW = GetSystemMetrics(SM_CXVSCROLL);
             
-            MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + MulDiv(2, dpi, 96), g_rcListPanel.top + innerPadding, 
-                       chkColW, staticH, TRUE);
-
             int pathW = listW - chkColW - sizeColW - linesColW - scrollW - MulDiv(4, dpi, 96);
             
-            int pathOffset = MulDiv(18, dpi, 96); // Fine-tuned for File Path
-            int subOffset = MulDiv(6, dpi, 96);  // Fine-tuned for Size and Lines
-            
-            MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + pathOffset, g_rcListPanel.top + innerPadding, 
-                       pathW - pathOffset, staticH, TRUE);
-                       
-            MoveWindow(hLblSize, g_rcListPanel.left + innerPadding + chkColW + pathW + subOffset, g_rcListPanel.top + innerPadding, 
-                       sizeColW - subOffset, staticH, TRUE);
-                       
-            MoveWindow(hLblLines, g_rcListPanel.left + innerPadding + chkColW + pathW + sizeColW + subOffset, g_rcListPanel.top + innerPadding, 
-                       linesColW - subOffset, staticH, TRUE);
-
-            MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding + staticH, 
+            MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding, 
                        listW, 
-                       (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2 - staticH, TRUE);
+                       (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2, TRUE);
 
+            MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + MulDiv(7, dpi, 96), g_rcListPanel.top + innerPadding + MulDiv(4, dpi, 96), 
+                       chkColW, MulDiv(16, dpi, 96), TRUE);
+                       
             ListView_SetColumnWidth(hListView, 0, chkColW);
             ListView_SetColumnWidth(hListView, 1, pathW);
             ListView_SetColumnWidth(hListView, 2, sizeColW);
@@ -1052,6 +1079,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
