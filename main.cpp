@@ -1,3 +1,4 @@
+#include <thread>
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
@@ -36,6 +37,7 @@
 // Global Variables
 HWND hMainWnd;
 HWND hListView;
+HFONT g_hFont = NULL;
 HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnExtract, hBtnSplit, hBtnSort;
 HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
@@ -127,7 +129,12 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
         RECT item0Rc;
         SendMessage(hWnd, HDM_GETITEMRECT, 0, (LPARAM)&item0Rc);
-        if (pt.x >= item0Rc.left && pt.x <= item0Rc.right) {
+        HDC screenDC = GetDC(NULL);
+        int dpi = GetDeviceCaps(screenDC, LOGPIXELSX);
+        ReleaseDC(NULL, screenDC);
+        int boxSize = MulDiv(13, dpi, 96);
+        int xPos = MulDiv(2, dpi, 96);
+        if (pt.x >= item0Rc.left + xPos && pt.x <= item0Rc.left + xPos + boxSize + 10) {
             HWND hListView = GetParent(hWnd);
             int totalItems = ListView_GetItemCount(hListView);
             bool anyUnchecked = false;
@@ -368,8 +375,17 @@ void AddFilesToList(const std::vector<std::wstring>& files) {
         std::wstring sizeStr = GetFileSizeStr(file);
         ListView_SetItemText(hListView, idx, 2, const_cast<LPWSTR>(sizeStr.c_str()));
         
-        std::wstring linesStr = GetFileLinesStr(file);
-        ListView_SetItemText(hListView, idx, 3, const_cast<LPWSTR>(linesStr.c_str()));
+        ListView_SetItemText(hListView, idx, 3, (LPWSTR)L"...");
+        
+        std::thread([file, idx]() {
+            std::wstring linesStr = GetFileLinesStr(file);
+            // Safe update: check if the item still has the same file path before updating
+            wchar_t buffer[32768];
+            ListView_GetItemText(hListView, idx, 1, buffer, 32768);
+            if (file == buffer) {
+                ListView_SetItemText(hListView, idx, 3, const_cast<LPWSTR>(linesStr.c_str()));
+            }
+        }).detach();
     }
 }
 
@@ -413,11 +429,11 @@ void OnAddFiles() {
 void OnRemoveFiles() {
     int count = ListView_GetItemCount(hListView);
     for (int i = count - 1; i >= 0; --i) {
-        if (ListView_GetCheckState(hListView, i)) {
+        if (ListView_GetItemState(hListView, i, LVIS_SELECTED)) {
             ListView_DeleteItem(hListView, i);
         }
     }
-}
+} 
 
 // Get checked files from list
 std::vector<std::wstring> GetSelectedFiles() {
@@ -425,9 +441,10 @@ std::vector<std::wstring> GetSelectedFiles() {
     int count = ListView_GetItemCount(hListView);
     for (int i = 0; i < count; ++i) {
         if (ListView_GetCheckState(hListView, i)) {
-            wchar_t buffer[MAX_PATH];
-            ListView_GetItemText(hListView, i, 1, buffer, MAX_PATH);
+            wchar_t* buffer = new wchar_t[32768];
+            ListView_GetItemText(hListView, i, 1, buffer, 32768);
             files.push_back(buffer);
+            delete[] buffer;
         }
     }
     return files;
@@ -487,7 +504,6 @@ void ExecuteTask(int mode) {
                 return;
             }
             currentTask->splitLines = lines;
-        } else if (mode == 4) {
             currentTask->splitMode = SendMessageW(hComboSplitMode, CB_GETCURSEL, 0, 0);
         } else if (mode == 5) {
             currentTask->sortMode = SendMessageW(hComboSort, CB_GETCURSEL, 0, 0);
@@ -507,10 +523,10 @@ void ExecuteTask(int mode) {
             StartExtractTask(currentTask);
         } else if (mode == 4) {
             StartSplitTask(currentTask);
-        } else if (mode == 4) {
-            currentTask->splitMode = SendMessageW(hComboSplitMode, CB_GETCURSEL, 0, 0);
         } else if (mode == 5) {
             StartSortTask(currentTask);
+        } else if (mode == 6) {
+            StartScrapeTask(currentTask);
         }
     }
 }
@@ -636,12 +652,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             // Force a slightly larger font for better readability
             ncm.lfMessageFont.lfHeight = -MulDiv(10, dpiY, 72); // 10pt font
-            HFONT hFont = CreateFontIndirectW(&ncm.lfMessageFont);
+            g_hFont = CreateFontIndirectW(&ncm.lfMessageFont);
 
             hListView = CreateWindowExW(0, WC_LISTVIEWW, L"",
                 WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
-            SendMessage(hListView, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hListView, WM_SETFONT, (WPARAM)g_hFont, TRUE);
             ListView_SetExtendedListViewStyle(hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
             SetWindowTheme(hListView, L"DarkMode_Explorer", NULL);
             // Removed to prevent theme interfering with custom draw
@@ -676,53 +692,53 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             hBtnAdd = CreateWindowW(L"BUTTON", L"Add Files", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 10, 320, 100, 30, hwnd, (HMENU)ID_BTN_ADD, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnAdd, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnAdd, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hBtnRemove = CreateWindowW(L"BUTTON", L"Remove Selected", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 120, 320, 120, 30, hwnd, (HMENU)ID_BTN_REMOVE, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnRemove, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnRemove, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hBtnCombine = CreateWindowW(L"BUTTON", L"Combine Selected", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 250, 320, 120, 30, hwnd, (HMENU)ID_BTN_COMBINE, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnCombine, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnCombine, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hBtnDedupe = CreateWindowW(L"BUTTON", L"Remove Duplicates", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_DEDUPE, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnDedupe, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnDedupe, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hBtnClean = CreateWindowW(L"BUTTON", L"Clean Invalid", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_CLEAN, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnClean, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnClean, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hBtnScrape = CreateWindowW(L"BUTTON", L"Raw Scrape", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SCRAPE, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnScrape, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnScrape, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
-            hEditDomain = CreateWindowExW(0, L"EDIT", L"gmail.com", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE,
+            hEditDomain = CreateWindowExW(0, L"EDIT", L"gmail.com", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL,
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_DOMAIN, GetModuleHandle(NULL), NULL);
-            SendMessage(hEditDomain, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hEditDomain, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hBtnExtract = CreateWindowW(L"BUTTON", L"Extract Domain", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_EXTRACT, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnExtract, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnExtract, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
-            hEditSplit = CreateWindowExW(0, L"EDIT", L"10000", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE | ES_NUMBER,
+            hEditSplit = CreateWindowExW(0, L"EDIT", L"10000", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_NUMBER,
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_SPLIT, GetModuleHandle(NULL), NULL);
-            SendMessage(hEditSplit, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hEditSplit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hComboSplitMode = CreateWindowExW(0, WC_COMBOBOXW, L"", WS_TABSTOP | WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_COMBO_SPLIT_MODE, GetModuleHandle(NULL), NULL);
-            SendMessage(hComboSplitMode, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hComboSplitMode, WM_SETFONT, (WPARAM)g_hFont, TRUE);
             SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"Lines");
             SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"MB");
             SendMessageW(hComboSplitMode, CB_SETCURSEL, 0, 0);
             hBtnSplit = CreateWindowW(L"BUTTON", L"Split File", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SPLIT, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnSplit, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnSplit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             hComboSort = CreateWindowExW(0, WC_COMBOBOXW, L"", WS_TABSTOP | WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_COMBO_SORT, GetModuleHandle(NULL), NULL);
-            SendMessage(hComboSort, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hComboSort, WM_SETFONT, (WPARAM)g_hFont, TRUE);
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Alphabetical (A-Z)");
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Alphabetical (Z-A)");
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Length (Shortest to Longest)");
@@ -734,7 +750,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             hBtnSort = CreateWindowW(L"BUTTON", L"Sort Files", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SORT, GetModuleHandle(NULL), NULL);
-            SendMessage(hBtnSort, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hBtnSort, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
             SetWindowSubclass(hBtnAdd, ButtonSubclassProc, 1, 0);
             SetWindowSubclass(hBtnRemove, ButtonSubclassProc, 2, 0);
@@ -769,6 +785,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case ID_BTN_EXTRACT: ExecuteTask(3); break;
                 case ID_BTN_SPLIT: ExecuteTask(4); break;
                 case ID_BTN_SORT: ExecuteTask(5); break;
+                case ID_BTN_SCRAPE: ExecuteTask(6); break;
                 case ID_CHK_SELECT_ALL: {
 bool isChecked = false; // TODO: get from header
                     int count = ListView_GetItemCount(hListView);
@@ -815,7 +832,6 @@ bool isChecked = false; // TODO: get from header
             if (msg) delete msg;
             g_nProgress = 0;
             InvalidateRect(hProgressBar, NULL, TRUE);
-            delete currentTask;
             currentTask = nullptr;
             return 0;
         }
@@ -823,7 +839,9 @@ bool isChecked = false; // TODO: get from header
         case WM_DESTROY: {
             if (currentTask) {
                 currentTask->cancelRequested = true;
-                // Give it a moment to cancel if it was running, memory might leak if closed mid-task, but OS cleans it up.
+            }
+            if (g_hFont) {
+                DeleteObject(g_hFont);
             }
             PostQuitMessage(0);
             return 0;
@@ -1069,7 +1087,6 @@ bool isChecked = false; // TODO: get from header
                 currentItemH += (btnH - currentOuterH);
                 SendMessageW(hComboSort, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
                 SendMessageW(hComboSplitMode, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
-            SendMessageW(hComboSplitMode, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
             }
             // Use standard item height for dropdown items to look nice
             SendMessageW(hComboSort, CB_SETITEMHEIGHT, 0, btnH - MulDiv(6, dpi, 96));  
@@ -1135,6 +1152,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,3 +1,4 @@
+#include <atomic>
 #pragma once
 
 #include <windows.h>
@@ -12,7 +13,7 @@ struct TaskContext {
     HWND hwndMain;
     std::vector<std::wstring> inputFiles;
     std::wstring outputFile;
-    bool cancelRequested;
+    std::atomic<bool> cancelRequested;
     std::string filterDomain;
     long long splitLines;
     int sortMode;
@@ -41,5 +42,6 @@ void StartSortTask(TaskContext* context);
 
 // Start a thread to scrape from dump
 void StartScrapeTask(TaskContext* context);
+
 
 
