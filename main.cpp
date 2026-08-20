@@ -92,7 +92,7 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
                 }
                 
                 int boxSize = MulDiv(13, dpi, 96);
-                int xPos = MulDiv(5, dpi, 96);
+                int xPos = MulDiv(4, dpi, 96);
                 int yPos = itemRc.top + (itemRc.bottom - itemRc.top - boxSize) / 2;
                 RECT boxRc = { xPos, yPos, xPos + boxSize, yPos + boxSize };
                 
@@ -112,7 +112,7 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
                 SendMessage(hWnd, HDM_GETITEMW, i, (LPARAM)&hdi);
                 
                 RECT textRc = itemRc;
-                textRc.left += MulDiv(6, dpi, 96);
+                textRc.left += 6;
                 DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             }
         }
@@ -1135,6 +1135,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
