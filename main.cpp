@@ -39,6 +39,7 @@ HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnEx
 HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
 HWND hChkSelectAll;
+HWND hLblHeader, hLblSize, hLblLines;
 
 TaskContext* currentTask = nullptr;
 int g_nProgress = 0;
@@ -524,9 +525,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ncm.lfMessageFont.lfHeight = -MulDiv(10, dpiY, 72); // 10pt font
             HFONT hFont = CreateFontIndirectW(&ncm.lfMessageFont);
 
-            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L" Select All", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                 0, 0, 0, 0, hwnd, (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
             SendMessage(hChkSelectAll, WM_SETFONT, (WPARAM)hFont, TRUE);
+            
+            hLblHeader = CreateWindowExW(0, L"STATIC", L"File Path", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLblHeader, WM_SETFONT, (WPARAM)hFont, TRUE);
+            
+            hLblSize = CreateWindowExW(0, L"STATIC", L"Size", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLblSize, WM_SETFONT, (WPARAM)hFont, TRUE);
+            
+            hLblLines = CreateWindowExW(0, L"STATIC", L"Lines", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLblLines, WM_SETFONT, (WPARAM)hFont, TRUE);
 
 
 
@@ -1009,6 +1022,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
