@@ -436,7 +436,7 @@ void OnAddFiles() {
 void OnRemoveFiles() {
     int count = ListView_GetItemCount(hListView);
     for (int i = count - 1; i >= 0; --i) {
-        if (ListView_GetItemState(hListView, i, LVIS_SELECTED)) {
+        if (ListView_GetCheckState(hListView, i)) {
             ListView_DeleteItem(hListView, i);
         }
     }
@@ -701,11 +701,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 10, 320, 100, 30, hwnd, (HMENU)ID_BTN_ADD, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnAdd, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
-            hBtnRemove = CreateWindowW(L"BUTTON", L"Remove Selected", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+            hBtnRemove = CreateWindowW(L"BUTTON", L"Remove Checked", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 120, 320, 120, 30, hwnd, (HMENU)ID_BTN_REMOVE, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnRemove, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
-            hBtnCombine = CreateWindowW(L"BUTTON", L"Combine Selected", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+            hBtnCombine = CreateWindowW(L"BUTTON", L"Combine Checked", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 250, 320, 120, 30, hwnd, (HMENU)ID_BTN_COMBINE, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnCombine, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
@@ -1159,6 +1159,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
