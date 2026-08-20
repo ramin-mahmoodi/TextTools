@@ -885,7 +885,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                        chkColW, staticH, TRUE);
 
             int pathW = listW - chkColW - sizeColW - linesColW - scrollW - MulDiv(4, dpi, 96);
-            int txtOffset = MulDiv(6, dpi, 96); // Align static text with ListView subitem padding
+            int txtOffset = MulDiv(12, dpi, 96); // Align static text with ListView subitem padding
             
             MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + txtOffset, g_rcListPanel.top + innerPadding, 
                        pathW - txtOffset, staticH, TRUE);
@@ -1050,6 +1050,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
