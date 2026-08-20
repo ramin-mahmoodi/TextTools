@@ -257,6 +257,12 @@ void AddFilesToList(const std::vector<std::wstring>& files) {
         int idx = ListView_InsertItem(hListView, &lvi);
         ListView_SetCheckState(hListView, idx, TRUE);
         ListView_SetItemText(hListView, idx, 1, const_cast<LPWSTR>(file.c_str()));
+        
+        std::wstring sizeStr = GetFileSizeStr(file);
+        ListView_SetItemText(hListView, idx, 2, const_cast<LPWSTR>(sizeStr.c_str()));
+        
+        std::wstring linesStr = GetFileLinesStr(file);
+        ListView_SetItemText(hListView, idx, 3, const_cast<LPWSTR>(linesStr.c_str()));
     }
 }
 
