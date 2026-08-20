@@ -39,7 +39,7 @@ HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnEx
 HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
 HWND hChkSelectAll;
-HWND hLblHeader;
+
 TaskContext* currentTask = nullptr;
 int g_nProgress = 0;
 
@@ -195,6 +195,57 @@ void SetUIState(bool enabled) {
 }
 
 // Add files to ListView
+#include <stdio.h>
+std::wstring FormatCommas(size_t value) {
+    std::wstring s = std::to_wstring(value);
+    int insertPosition = s.length() - 3;
+    while (insertPosition > 0) {
+        s.insert(insertPosition, L",");
+        insertPosition -= 3;
+    }
+    return s;
+}
+
+std::wstring GetFileSizeStr(const std::wstring& path) {
+    HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return L"0 B";
+    LARGE_INTEGER size;
+    GetFileSizeEx(hFile, &size);
+    CloseHandle(hFile);
+    double mb = (double)size.QuadPart / (1024.0 * 1024.0);
+    if (mb < 1.0) {
+        double kb = (double)size.QuadPart / 1024.0;
+        return std::to_wstring((int)kb) + L" KB";
+    }
+    wchar_t buf[64];
+    swprintf(buf, 64, L"%.2f MB", mb);
+    return std::wstring(buf);
+}
+
+std::wstring GetFileLinesStr(const std::wstring& path) {
+    HANDLE hFile = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return L"0";
+    LARGE_INTEGER size;
+    GetFileSizeEx(hFile, &size);
+    if (size.QuadPart == 0) { CloseHandle(hFile); return L"0"; }
+    HANDLE hMap = CreateFileMappingW(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    if (!hMap) { CloseHandle(hFile); return L"0"; }
+    const char* view = (const char*)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+    if (!view) { CloseHandle(hMap); CloseHandle(hFile); return L"?"; }
+    
+    size_t lines = 0;
+    for (long long i = 0; i < size.QuadPart; ++i) {
+        if (view[i] == '\n') lines++;
+    }
+    if (size.QuadPart > 0 && view[size.QuadPart - 1] != '\n') lines++;
+    
+    UnmapViewOfFile(view);
+    CloseHandle(hMap);
+    CloseHandle(hFile);
+    
+    return FormatCommas(lines);
+}
+
 void AddFilesToList(const std::vector<std::wstring>& files) {
     for (const auto& file : files) {
         LVITEMW lvi = {0};
@@ -473,16 +524,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ncm.lfMessageFont.lfHeight = -MulDiv(10, dpiY, 72); // 10pt font
             HFONT hFont = CreateFontIndirectW(&ncm.lfMessageFont);
 
-            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L" Select All", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                 0, 0, 0, 0, hwnd, (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
             SendMessage(hChkSelectAll, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-            hLblHeader = CreateWindowExW(0, L"STATIC", L"File Path", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
-            SendMessage(hLblHeader, WM_SETFONT, (WPARAM)hFont, TRUE);
+
 
             hListView = CreateWindowExW(0, WC_LISTVIEWW, L"",
-                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_NOCOLUMNHEADER | LVS_SHOWSELALWAYS,
+                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
             SendMessage(hListView, WM_SETFONT, (WPARAM)hFont, TRUE);
             ListView_SetExtendedListViewStyle(hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
@@ -800,14 +849,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             g_rcListPanel.bottom = g_rcControlPanel.top - padding;
             
             int listW = (g_rcListPanel.right - g_rcListPanel.left) - innerPadding * 2;
-            int chkColW = MulDiv(30, dpi, 96);
+            int chkColW = MulDiv(90, dpi, 96);
             int alignOffset = MulDiv(2, dpi, 96);
             
             MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + alignOffset, g_rcListPanel.top + innerPadding, 
                        chkColW, staticH, TRUE);
 
-            MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + alignOffset, g_rcListPanel.top + innerPadding, 
-                       listW - chkColW - alignOffset, staticH, TRUE);
+
 
             MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding + staticH, 
                        listW, 
@@ -961,6 +1009,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
+
+
+
+
+
 
 
 
