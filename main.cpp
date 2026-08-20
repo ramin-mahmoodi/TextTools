@@ -160,6 +160,13 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 
 LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
     switch (uMsg) {
+        case WM_KEYDOWN:
+        case WM_CHAR:
+        case WM_KEYUP:
+            if (wParam == VK_RETURN) {
+                return 0; // Prevent newline insertion
+            }
+            break;
         case WM_NCPAINT:
             return 0; // Disable standard border
         case WM_PAINT: {
@@ -714,7 +721,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SCRAPE, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnScrape, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
-            hEditDomain = CreateWindowExW(0, L"EDIT", L"gmail.com", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL,
+            hEditDomain = CreateWindowExW(0, L"EDIT", L"gmail.com", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE,
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_DOMAIN, GetModuleHandle(NULL), NULL);
             SendMessage(hEditDomain, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
@@ -722,7 +729,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_EXTRACT, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnExtract, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
-            hEditSplit = CreateWindowExW(0, L"EDIT", L"10000", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_NUMBER,
+            hEditSplit = CreateWindowExW(0, L"EDIT", L"10000", WS_TABSTOP | WS_VISIBLE | WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE | ES_NUMBER,
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_SPLIT, GetModuleHandle(NULL), NULL);
             SendMessage(hEditSplit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
 
@@ -1152,6 +1159,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
