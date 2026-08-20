@@ -544,7 +544,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"Lines");
             SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"MB");
             SendMessageW(hComboSplitMode, CB_SETCURSEL, 0, 0);
-            hBtnSplit = CreateWindowW(L"BUTTON", L"Split by Lines", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+            hBtnSplit = CreateWindowW(L"BUTTON", L"Split File", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SPLIT, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnSplit, WM_SETFONT, (WPARAM)hFont, TRUE);
 
@@ -939,10 +939,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int initW = MulDiv(700, dpi, 96);
     int initH = MulDiv(650, dpi, 96);
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+    int startX = (screenW - initW) / 2;
+    int startY = (screenH - initH) / 2;
 
     hMainWnd = CreateWindowExW(
         0, CLASS_NAME, L"TextTools",
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, initW, initH,
+        WS_OVERLAPPEDWINDOW, startX, startY, initW, initH,
         NULL, NULL, hInstance, NULL);
 
     if (hMainWnd == NULL) return 0;
@@ -957,6 +961,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
