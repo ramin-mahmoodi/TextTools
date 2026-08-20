@@ -558,6 +558,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SendMessageW(hComboSort, CB_ADDSTRING, 0, (LPARAM)L"Randomize (Shuffle)");
             SendMessageW(hComboSort, CB_SETCURSEL, 0, 0);
             SetWindowTheme(hComboSort, L"", L"");
+            SetWindowTheme(hComboSplitMode, L"", L"");
 
             hBtnSort = CreateWindowW(L"BUTTON", L"Sort Files", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SORT, GetModuleHandle(NULL), NULL);
@@ -862,7 +863,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Split Layout
             int splitStartY = extractStartY + extractHeight + separatorHeight;
-            MoveWindow(hEditSplit, g_rcControlPanel.left + innerPadding, splitStartY, editW, btnH, TRUE);
+                        int comboSplitW = MulDiv(80, dpi, 96);
+            MoveWindow(hEditSplit, g_rcControlPanel.left + innerPadding, splitStartY, editW - comboSplitW - spacing, btnH, TRUE);
+            MoveWindow(hComboSplitMode, g_rcControlPanel.left + innerPadding + editW - comboSplitW, splitStartY, comboSplitW, btnH * 4, TRUE);
             MoveWindow(hBtnSplit, g_rcControlPanel.left + innerPadding + editW + spacing, splitStartY, extBtnW, btnH, TRUE);
 
             // Vertically center text in Edit control using EM_SETRECT
@@ -882,6 +885,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Adjust ComboBox internal heights so its collapsed outer bounding box matches btnH exactly
             int currentItemH = btnH - MulDiv(6, dpi, 96);
             SendMessageW(hComboSort, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
+            SendMessageW(hComboSplitMode, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
             
             RECT rcCombo;
             GetWindowRect(hComboSort, &rcCombo);
@@ -890,9 +894,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (currentOuterH != btnH) {
                 currentItemH += (btnH - currentOuterH);
                 SendMessageW(hComboSort, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
+                SendMessageW(hComboSplitMode, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
+            SendMessageW(hComboSplitMode, CB_SETITEMHEIGHT, (WPARAM)-1, currentItemH);
             }
             // Use standard item height for dropdown items to look nice
             SendMessageW(hComboSort, CB_SETITEMHEIGHT, 0, btnH - MulDiv(6, dpi, 96));  
+            SendMessageW(hComboSplitMode, CB_SETITEMHEIGHT, 0, btnH - MulDiv(6, dpi, 96));  
             
             // ComboBox overall window height must include drop-down area
             MoveWindow(hComboSort, g_rcControlPanel.left + innerPadding, sortStartY, editW, btnH * 6, TRUE);
@@ -950,6 +957,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
