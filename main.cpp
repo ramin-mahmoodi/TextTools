@@ -7,6 +7,7 @@
 #include <commdlg.h>
 #include <dwmapi.h>
 #include <uxtheme.h>
+#include <vsstyle.h>
 #include <algorithm>
 #include "processing.h"
 
@@ -38,7 +39,6 @@ HWND hListView;
 HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnExtract, hBtnSplit, hBtnSort;
 HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
-HWND hChkSelectAll;
 
 
 TaskContext* currentTask = nullptr;
@@ -60,31 +60,61 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         HPEN hPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
         HGDIOBJ hOldPen = SelectObject(hdc, hPen);
         
-        HFONT hFont = (HFONT)SendMessage(GetParent(hWnd), WM_GETFONT, 0, 0); // Get font from main window
+        HWND hListView = GetParent(hWnd);
+        HFONT hFont = (HFONT)SendMessage(hListView, WM_GETFONT, 0, 0);
         HGDIOBJ hOldFont = SelectObject(hdc, hFont);
         
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(240, 240, 240));
         
+        HDC screenDC = GetDC(NULL);
+        int dpi = GetDeviceCaps(screenDC, LOGPIXELSX);
+        ReleaseDC(NULL, screenDC);
+        
         for (int i = 0; i < count; i++) {
             RECT itemRc;
             SendMessage(hWnd, HDM_GETITEMRECT, i, (LPARAM)&itemRc);
             
-            if (i < count - 1) { // Draw separator for all but the last column
+            if (i < count - 1) { 
                 MoveToEx(hdc, itemRc.right - 1, itemRc.top + 4, NULL);
                 LineTo(hdc, itemRc.right - 1, itemRc.bottom - 4);
             }
             
-            wchar_t text[256] = {0};
-            HDITEMW hdi = {0};
-            hdi.mask = HDI_TEXT;
-            hdi.pszText = text;
-            hdi.cchTextMax = 256;
-            SendMessage(hWnd, HDM_GETITEMW, i, (LPARAM)&hdi);
-            
-            RECT textRc = itemRc;
-            textRc.left += 6; // Fixed padding
-            DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            if (i == 0) {
+                bool bAllChecked = true;
+                int totalItems = ListView_GetItemCount(hListView);
+                if (totalItems == 0) bAllChecked = false;
+                for (int j = 0; j < totalItems; j++) {
+                    if (!ListView_GetCheckState(hListView, j)) {
+                        bAllChecked = false;
+                        break;
+                    }
+                }
+                
+                int boxSize = MulDiv(13, dpi, 96);
+                int xPos = MulDiv(5, dpi, 96);
+                int yPos = itemRc.top + (itemRc.bottom - itemRc.top - boxSize) / 2;
+                RECT boxRc = { xPos, yPos, xPos + boxSize, yPos + boxSize };
+                
+                HTHEME hTheme = OpenThemeData(hWnd, L"BUTTON");
+                if (hTheme) {
+                    DrawThemeBackground(hTheme, hdc, BP_CHECKBOX, bAllChecked ? CBS_CHECKEDNORMAL : CBS_UNCHECKEDNORMAL, &boxRc, NULL);
+                    CloseThemeData(hTheme);
+                } else {
+                    DrawFrameControl(hdc, &boxRc, DFC_BUTTON, DFCS_BUTTONCHECK | (bAllChecked ? DFCS_CHECKED : 0));
+                }
+            } else {
+                wchar_t text[256] = {0};
+                HDITEMW hdi = {0};
+                hdi.mask = HDI_TEXT;
+                hdi.pszText = text;
+                hdi.cchTextMax = 256;
+                SendMessage(hWnd, HDM_GETITEMW, i, (LPARAM)&hdi);
+                
+                RECT textRc = itemRc;
+                textRc.left += MulDiv(6, dpi, 96);
+                DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            }
         }
         
         SelectObject(hdc, hOldFont);
@@ -93,12 +123,26 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         
         EndPaint(hWnd, &ps);
         return 0;
-    } else if (uMsg == WM_CTLCOLORSTATIC) {
-        static HBRUSH hbrStatic = CreateSolidBrush(RGB(36, 36, 36));
-        HDC hdcStatic = (HDC)wParam;
-        SetTextColor(hdcStatic, RGB(240, 240, 240));
-        SetBkColor(hdcStatic, RGB(36, 36, 36));
-        return (INT_PTR)hbrStatic;
+    } else if (uMsg == WM_LBUTTONDOWN) {
+        POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
+        RECT item0Rc;
+        SendMessage(hWnd, HDM_GETITEMRECT, 0, (LPARAM)&item0Rc);
+        if (pt.x >= item0Rc.left && pt.x <= item0Rc.right) {
+            HWND hListView = GetParent(hWnd);
+            int totalItems = ListView_GetItemCount(hListView);
+            bool anyUnchecked = false;
+            for (int i = 0; i < totalItems; i++) {
+                if (!ListView_GetCheckState(hListView, i)) {
+                    anyUnchecked = true;
+                    break;
+                }
+            }
+            for (int i = 0; i < totalItems; i++) {
+                ListView_SetCheckState(hListView, i, anyUnchecked);
+            }
+            InvalidateRect(hWnd, NULL, FALSE);
+            return 0;
+        }
     } else if (uMsg == WM_ERASEBKGND) {
         return 1;
     } else if (uMsg == WM_NCDESTROY) {
@@ -255,7 +299,7 @@ void SetUIState(bool enabled) {
     EnableWindow(hBtnSort, enabled);
     EnableWindow(hComboSort, enabled);
     EnableWindow(hComboSplitMode, enabled);
-    EnableWindow(hChkSelectAll, enabled);
+
 }
 
 // Add files to ListView
@@ -606,8 +650,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ListView_SetTextColor(hListView, RGB(240, 240, 240));
             SetWindowSubclass(ListView_GetHeader(hListView), HeaderSubclassProc, 4, 0);
 
-            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                0, 0, 0, 0, ListView_GetHeader(hListView), (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
 
             LVCOLUMNW lvc = {0};
             lvc.mask = LVCF_WIDTH | LVCF_SUBITEM | LVCF_TEXT;
@@ -728,7 +770,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case ID_BTN_SPLIT: ExecuteTask(4); break;
                 case ID_BTN_SORT: ExecuteTask(5); break;
                 case ID_CHK_SELECT_ALL: {
-                    bool isChecked = SendMessage(hChkSelectAll, BM_GETCHECK, 0, 0) == BST_CHECKED;
+bool isChecked = false; // TODO: get from header
                     int count = ListView_GetItemCount(hListView);
                     for (int i = 0; i < count; ++i) ListView_SetCheckState(hListView, i, isChecked);
                     break;
@@ -941,8 +983,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                        listW, 
                        (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2, TRUE);
 
-            MoveWindow(hChkSelectAll, MulDiv(3, dpi, 96), MulDiv(4, dpi, 96), 
-                       chkColW, MulDiv(16, dpi, 96), TRUE);
+
                        
             ListView_SetColumnWidth(hListView, 0, chkColW);
             ListView_SetColumnWidth(hListView, 1, pathW);
@@ -1094,6 +1135,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
+
 
 
 
