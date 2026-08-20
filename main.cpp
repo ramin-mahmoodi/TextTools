@@ -92,7 +92,7 @@ LRESULT CALLBACK HeaderSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
                 }
                 
                 int boxSize = MulDiv(13, dpi, 96);
-                int xPos = MulDiv(4, dpi, 96);
+                int xPos = MulDiv(2, dpi, 96);
                 int yPos = itemRc.top + (itemRc.bottom - itemRc.top - boxSize) / 2;
                 RECT boxRc = { xPos, yPos, xPos + boxSize, yPos + boxSize };
                 
@@ -1135,6 +1135,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
