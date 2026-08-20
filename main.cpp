@@ -335,9 +335,13 @@ std::wstring GetFileSizeStr(const std::wstring& path) {
     GetFileSizeEx(hFile, &size);
     CloseHandle(hFile);
     double mb = (double)size.QuadPart / (1024.0 * 1024.0);
-    if (mb < 1.0) {
+    if (size.QuadPart < 1024) {
+        return std::to_wstring(size.QuadPart) + L" B";
+    } else if (mb < 1.0) {
         double kb = (double)size.QuadPart / 1024.0;
-        return std::to_wstring((int)kb) + L" KB";
+        wchar_t buf[64];
+        swprintf(buf, 64, L"%.1f KB", kb);
+        return std::wstring(buf);
     }
     wchar_t buf[64];
     swprintf(buf, 64, L"%.2f MB", mb);
@@ -860,12 +864,13 @@ bool isChecked = false; // TODO: get from header
                 HDC hdc = dis->hDC;
                 RECT rect = dis->rcItem;
                 
-                bool isPressed = dis->itemState & ODS_SELECTED;
-                bool isHovered = GetPropW(dis->hwndItem, L"Hovered") != NULL;
+                bool isDisabled = dis->itemState & ODS_DISABLED;
+                bool isPressed = !isDisabled && (dis->itemState & ODS_SELECTED);
+                bool isHovered = !isDisabled && (GetPropW(dis->hwndItem, L"Hovered") != NULL);
                 
-                COLORREF bgCol = isPressed ? RGB(0, 122, 204) : (isHovered ? RGB(62, 62, 66) : RGB(45, 45, 48));
+                COLORREF bgCol = isDisabled ? RGB(40, 40, 40) : (isPressed ? RGB(0, 122, 204) : (isHovered ? RGB(62, 62, 66) : RGB(45, 45, 48)));
                 HBRUSH brush = CreateSolidBrush(bgCol);
-                HPEN pen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
+                HPEN pen = CreatePen(PS_SOLID, 1, isDisabled ? RGB(50, 50, 50) : RGB(60, 60, 60));
                 
                 HGDIOBJ oldBrush = SelectObject(hdc, brush);
                 HGDIOBJ oldPen = SelectObject(hdc, pen);
@@ -881,7 +886,7 @@ bool isChecked = false; // TODO: get from header
                 GetWindowTextW(dis->hwndItem, text, 256);
                 
                 SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, RGB(240, 240, 240));
+                SetTextColor(hdc, isDisabled ? RGB(120, 120, 120) : RGB(240, 240, 240));
                 
                 HFONT hFont = (HFONT)SendMessage(dis->hwndItem, WM_GETFONT, 0, 0);
                 HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
@@ -955,6 +960,7 @@ bool isChecked = false; // TODO: get from header
         case WM_SIZE: {
             int width = LOWORD(lParam);
             int height = HIWORD(lParam);
+            if (wParam == SIZE_MINIMIZED || width <= 0 || height <= 0) return 0;
             
             HDC hdc = GetDC(hwnd);
             int dpi = GetDeviceCaps(hdc, LOGPIXELSY);
@@ -1159,6 +1165,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
+
 
 
 
