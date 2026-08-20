@@ -564,6 +564,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             lvc.cx = 500;
             ListView_InsertColumn(hListView, 1, &lvc);
 
+            // Column 2: Size
+            lvc.cx = 80;
+            ListView_InsertColumn(hListView, 2, &lvc);
+            
+            // Column 3: Lines
+            lvc.cx = 100;
+            ListView_InsertColumn(hListView, 3, &lvc);
+
             hBtnAdd = CreateWindowW(L"BUTTON", L"Add Files", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 10, 320, 100, 30, hwnd, (HMENU)ID_BTN_ADD, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnAdd, WM_SETFONT, (WPARAM)hFont, TRUE);
