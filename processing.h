@@ -16,8 +16,9 @@ struct TaskContext {
     std::string filterDomain;
     long long splitLines;
     int sortMode;
+    int splitMode;
 
-    TaskContext() : hwndMain(NULL), cancelRequested(false), splitLines(10000), sortMode(0) {}
+    TaskContext() : hwndMain(NULL), cancelRequested(false), splitLines(10000), sortMode(0), splitMode(0) {}
 };
 
 // Start a thread to combine files
@@ -40,4 +41,5 @@ void StartSortTask(TaskContext* context);
 
 // Start a thread to scrape from dump
 void StartScrapeTask(TaskContext* context);
+
 

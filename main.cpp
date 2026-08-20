@@ -29,13 +29,14 @@
 #define ID_EDIT_SPLIT 112
 #define ID_BTN_SORT 113
 #define ID_COMBO_SORT 114
+#define ID_COMBO_SPLIT_MODE 116
 #define ID_BTN_SCRAPE 115
 
 // Global Variables
 HWND hMainWnd;
 HWND hListView;
 HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnExtract, hBtnSplit, hBtnSort;
-HWND hEditDomain, hEditSplit, hComboSort;
+HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
 HWND hChkSelectAll;
 HWND hLblHeader;
@@ -189,6 +190,7 @@ void SetUIState(bool enabled) {
     EnableWindow(hEditSplit, enabled);
     EnableWindow(hBtnSort, enabled);
     EnableWindow(hComboSort, enabled);
+    EnableWindow(hComboSplitMode, enabled);
     EnableWindow(hChkSelectAll, enabled);
 }
 
@@ -320,6 +322,8 @@ void ExecuteTask(int mode) {
                 return;
             }
             currentTask->splitLines = lines;
+        } else if (mode == 4) {
+            currentTask->splitMode = SendMessageW(hComboSplitMode, CB_GETCURSEL, 0, 0);
         } else if (mode == 5) {
             currentTask->sortMode = SendMessageW(hComboSort, CB_GETCURSEL, 0, 0);
             if (currentTask->sortMode == CB_ERR) currentTask->sortMode = 0;
@@ -338,6 +342,8 @@ void ExecuteTask(int mode) {
             StartExtractTask(currentTask);
         } else if (mode == 4) {
             StartSplitTask(currentTask);
+        } else if (mode == 4) {
+            currentTask->splitMode = SendMessageW(hComboSplitMode, CB_GETCURSEL, 0, 0);
         } else if (mode == 5) {
             StartSortTask(currentTask);
         }
@@ -532,6 +538,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_SPLIT, GetModuleHandle(NULL), NULL);
             SendMessage(hEditSplit, WM_SETFONT, (WPARAM)hFont, TRUE);
 
+            hComboSplitMode = CreateWindowExW(0, WC_COMBOBOXW, L"", WS_TABSTOP | WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | CBS_HASSTRINGS,
+                0, 0, 0, 0, hwnd, (HMENU)ID_COMBO_SPLIT_MODE, GetModuleHandle(NULL), NULL);
+            SendMessage(hComboSplitMode, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"Lines");
+            SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"MB");
+            SendMessageW(hComboSplitMode, CB_SETCURSEL, 0, 0);
             hBtnSplit = CreateWindowW(L"BUTTON", L"Split by Lines", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 0, 0, 0, 0, hwnd, (HMENU)ID_BTN_SPLIT, GetModuleHandle(NULL), NULL);
             SendMessage(hBtnSplit, WM_SETFONT, (WPARAM)hFont, TRUE);
@@ -563,6 +575,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SetWindowSubclass(hBtnSplit, ButtonSubclassProc, 9, 0);
             SetWindowSubclass(hBtnSort, ButtonSubclassProc, 10, 0);
             SetWindowSubclass(hComboSort, ComboSubclassProc, 11, 0);
+            SetWindowSubclass(hComboSplitMode, ComboSubclassProc, 13, 0);
 
             hProgressBar = CreateWindowExW(0, WC_STATICW, NULL,
                 WS_CHILD | WS_VISIBLE | SS_OWNERDRAW,
@@ -937,6 +950,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 

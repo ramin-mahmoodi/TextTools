@@ -1,3 +1,4 @@
+#include <future>
 #include "processing.h"
 #include <fstream>
 #include <unordered_set>
@@ -190,6 +191,18 @@ void CleanThread(TaskContext* context) {
     size_t originalLines = 0;
     size_t invalidLines = 0;
 
+    const size_t BATCH_SIZE = 100000;
+    std::vector<std::string> batch;
+    batch.reserve(BATCH_SIZE);
+
+    auto processBatch = [](const std::vector<std::string>& b) {
+        std::vector<char> valid(b.size(), 0);
+        for (size_t i = 0; i < b.size(); ++i) {
+            if (IsValidEmailPass(b[i])) valid[i] = 1;
+        }
+        return valid;
+    };
+
     for (const auto& file : context->inputFiles) {
         std::ifstream in(file.c_str(), std::ios::binary);
         if (!in) continue;
@@ -198,25 +211,55 @@ void CleanThread(TaskContext* context) {
         in.rdbuf()->pubsetbuf(ioBuffer.data(), ioBuffer.size());
         
         std::string line;
-        while (std::getline(in, line)) {
-            if (context->cancelRequested) {
-                out.close();
-                DeleteFileW(context->outputFile.c_str());
-                PostMessage(context->hwndMain, WM_WORKER_FINISHED, 0, 0);
-                return;
-            }
-            processedSize += line.length() + 1;
-            originalLines++;
-
-            if (!line.empty() && line.back() == '\r') {
-                line.pop_back();
+        while (true) {
+            bool hasLine = (bool)std::getline(in, line);
+            if (hasLine) {
+                processedSize += line.length() + 1;
+                originalLines++;
+                if (!line.empty() && line.back() == '\r') line.pop_back();
+                batch.push_back(std::move(line));
             }
 
-            if (IsValidEmailPass(line)) {
-                out << line << "\r\n";
-            } else {
-                invalidLines++;
+            if (batch.size() >= BATCH_SIZE || (!hasLine && !batch.empty())) {
+                if (context->cancelRequested) {
+                    out.close();
+                    DeleteFileW(context->outputFile.c_str());
+                    PostMessage(context->hwndMain, WM_WORKER_FINISHED, 0, 0);
+                    return;
+                }
+
+                // Use multi-threading to process the batch
+                size_t numThreads = std::thread::hardware_concurrency();
+                if (numThreads == 0) numThreads = 4;
+                
+                std::vector<std::future<std::vector<char>>> futures;
+                size_t chunkSize = (batch.size() + numThreads - 1) / numThreads;
+                
+                for (size_t t = 0; t < numThreads; ++t) {
+                    size_t startIdx = t * chunkSize;
+                    size_t endIdx = std::min(startIdx + chunkSize, batch.size());
+                    if (startIdx < endIdx) {
+                        std::vector<std::string> subBatch(batch.begin() + startIdx, batch.begin() + endIdx);
+                        futures.push_back(std::async(std::launch::async, processBatch, std::move(subBatch)));
+                    }
+                }
+                
+                size_t currentIdx = 0;
+                for (auto& f : futures) {
+                    std::vector<char> valid = f.get();
+                    for (size_t i = 0; i < valid.size(); ++i) {
+                        if (valid[i]) {
+                            out << batch[currentIdx] << "\r\n";
+                        } else {
+                            invalidLines++;
+                        }
+                        currentIdx++;
+                    }
+                }
+                batch.clear();
             }
+            
+            if (!hasLine) break;
 
             int percent = (int)((processedSize * 100) / totalSize);
             if (percent != lastPercent) {
@@ -565,3 +608,5 @@ void StartScrapeTask(TaskContext* context) {
     std::thread t(ScrapeThread, context);
     t.detach();
 }
+
+
