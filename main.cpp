@@ -862,20 +862,32 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             g_rcListPanel.bottom = g_rcControlPanel.top - padding;
             
             int listW = (g_rcListPanel.right - g_rcListPanel.left) - innerPadding * 2;
-            int chkColW = MulDiv(90, dpi, 96);
-            int alignOffset = MulDiv(2, dpi, 96);
+            int chkColW = MulDiv(30, dpi, 96);
+            int sizeColW = MulDiv(80, dpi, 96);
+            int linesColW = MulDiv(100, dpi, 96);
+            int scrollW = GetSystemMetrics(SM_CXVSCROLL);
             
-            MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + alignOffset, g_rcListPanel.top + innerPadding, 
+            MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + MulDiv(2, dpi, 96), g_rcListPanel.top + innerPadding, 
                        chkColW, staticH, TRUE);
 
-
+            int pathW = listW - chkColW - sizeColW - linesColW - scrollW - MulDiv(4, dpi, 96);
+            MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + MulDiv(2, dpi, 96), g_rcListPanel.top + innerPadding, 
+                       pathW, staticH, TRUE);
+                       
+            MoveWindow(hLblSize, g_rcListPanel.left + innerPadding + chkColW + pathW, g_rcListPanel.top + innerPadding, 
+                       sizeColW, staticH, TRUE);
+                       
+            MoveWindow(hLblLines, g_rcListPanel.left + innerPadding + chkColW + pathW + sizeColW, g_rcListPanel.top + innerPadding, 
+                       linesColW, staticH, TRUE);
 
             MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding + staticH, 
                        listW, 
                        (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2 - staticH, TRUE);
-            
+
             ListView_SetColumnWidth(hListView, 0, chkColW);
-            ListView_SetColumnWidth(hListView, 1, listW - chkColW - MulDiv(30, dpi, 96));
+            ListView_SetColumnWidth(hListView, 1, pathW);
+            ListView_SetColumnWidth(hListView, 2, sizeColW);
+            ListView_SetColumnWidth(hListView, 3, linesColW);
             
             int buttonsStartY = g_rcControlPanel.top + innerPadding;
             
@@ -1022,6 +1034,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
