@@ -39,6 +39,7 @@ HWND hBtnAdd, hBtnRemove, hBtnCombine, hBtnDedupe, hBtnClean, hBtnScrape, hBtnEx
 HWND hEditDomain, hEditSplit, hComboSort, hComboSplitMode;
 HWND hProgressBar;
 HWND hChkSelectAll;
+HWND hLblHeader, hLblSize, hLblLines;
 
 
 TaskContext* currentTask = nullptr;
@@ -579,42 +580,53 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ncm.lfMessageFont.lfHeight = -MulDiv(10, dpiY, 72); // 10pt font
             HFONT hFont = CreateFontIndirectW(&ncm.lfMessageFont);
 
+            hLblHeader = CreateWindowExW(0, L"STATIC", L"File Path", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLblHeader, WM_SETFONT, (WPARAM)hFont, TRUE);
+            
+            hLblSize = CreateWindowExW(0, L"STATIC", L"Size", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLblSize, WM_SETFONT, (WPARAM)hFont, TRUE);
+            
+            hLblLines = CreateWindowExW(0, L"STATIC", L"Lines", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+                0, 0, 0, 0, hwnd, NULL, GetModuleHandle(NULL), NULL);
+            SendMessage(hLblLines, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                0, 0, 0, 0, hwnd, (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
+            SendMessage(hChkSelectAll, WM_SETFONT, (WPARAM)hFont, TRUE);
+
             hListView = CreateWindowExW(0, WC_LISTVIEWW, L"",
-                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS,
+                WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_NOCOLUMNHEADER | LVS_SHOWSELALWAYS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
             SendMessage(hListView, WM_SETFONT, (WPARAM)hFont, TRUE);
             ListView_SetExtendedListViewStyle(hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
             SetWindowTheme(hListView, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(ListView_GetHeader(hListView), L"DarkMode_ItemsView", NULL);
             ListView_SetBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextColor(hListView, RGB(240, 240, 240));
-            SetWindowSubclass(hListView, ListViewSubclassProc, 3, 0);
-
-            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                0, 0, 0, 0, ListView_GetHeader(hListView), (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
 
             LVCOLUMNW lvc = {0};
-            lvc.mask = LVCF_WIDTH | LVCF_SUBITEM | LVCF_TEXT;
+            lvc.mask = LVCF_WIDTH | LVCF_SUBITEM;
             
             // Column 0: Checkbox
             lvc.cx = 30;
-            lvc.pszText = (LPWSTR)L"";
+            
             ListView_InsertColumn(hListView, 0, &lvc);
             
             // Column 1: File Path
             lvc.cx = 500;
-            lvc.pszText = (LPWSTR)L"File Path";
+            
             ListView_InsertColumn(hListView, 1, &lvc);
 
             // Column 2: Size
             lvc.cx = 100;
-            lvc.pszText = (LPWSTR)L"Size";
+            
             ListView_InsertColumn(hListView, 2, &lvc);
             
             // Column 3: Lines
             lvc.cx = 100;
-            lvc.pszText = (LPWSTR)L"Lines";
+            
             ListView_InsertColumn(hListView, 3, &lvc);
 
             hBtnAdd = CreateWindowW(L"BUTTON", L"Add Files", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
@@ -922,11 +934,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             int pathW = listW - chkColW - sizeColW - linesColW - scrollW - MulDiv(4, dpi, 96);
             
-            MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding, 
-                       listW, 
-                       (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2, TRUE);
+            int textPad = MulDiv(6, dpi, 96);
+            
+            MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + MulDiv(3, dpi, 96), g_rcListPanel.top + innerPadding, 
+                       pathW, staticH, TRUE);
+                       
+            MoveWindow(hLblSize, g_rcListPanel.left + innerPadding + chkColW + pathW + textPad, g_rcListPanel.top + innerPadding, 
+                       sizeColW, staticH, TRUE);
+                       
+            MoveWindow(hLblLines, g_rcListPanel.left + innerPadding + chkColW + pathW + sizeColW + textPad, g_rcListPanel.top + innerPadding, 
+                       linesColW, staticH, TRUE);
 
-            MoveWindow(hChkSelectAll, MulDiv(4, dpi, 96), MulDiv(4, dpi, 96), 
+            MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding + staticH, 
+                       listW, 
+                       (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2 - staticH, TRUE);
+
+            MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + MulDiv(7, dpi, 96), g_rcListPanel.top + innerPadding + MulDiv(4, dpi, 96), 
                        chkColW, MulDiv(16, dpi, 96), TRUE);
                        
             ListView_SetColumnWidth(hListView, 0, chkColW);
@@ -1079,6 +1102,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
