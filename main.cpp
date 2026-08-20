@@ -926,7 +926,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                        listW, 
                        (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2, TRUE);
 
-            MoveWindow(hChkSelectAll, MulDiv(7, dpi, 96), MulDiv(5, dpi, 96), 
+            MoveWindow(hChkSelectAll, MulDiv(4, dpi, 96), MulDiv(4, dpi, 96), 
                        chkColW, MulDiv(16, dpi, 96), TRUE);
                        
             ListView_SetColumnWidth(hListView, 0, chkColW);
@@ -1079,6 +1079,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
