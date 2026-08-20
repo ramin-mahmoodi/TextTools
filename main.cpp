@@ -579,20 +579,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ncm.lfMessageFont.lfHeight = -MulDiv(10, dpiY, 72); // 10pt font
             HFONT hFont = CreateFontIndirectW(&ncm.lfMessageFont);
 
-            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                0, 0, 0, 0, hwnd, (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
-            SendMessage(hChkSelectAll, WM_SETFONT, (WPARAM)hFont, TRUE);
-            
             hListView = CreateWindowExW(0, WC_LISTVIEWW, L"",
                 WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SHOWSELALWAYS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_LISTVIEW, GetModuleHandle(NULL), NULL);
             SendMessage(hListView, WM_SETFONT, (WPARAM)hFont, TRUE);
             ListView_SetExtendedListViewStyle(hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
             SetWindowTheme(hListView, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(ListView_GetHeader(hListView), L"DarkMode_ItemsView", NULL);
             ListView_SetBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextColor(hListView, RGB(240, 240, 240));
             SetWindowSubclass(hListView, ListViewSubclassProc, 3, 0);
+
+            hChkSelectAll = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                0, 0, 0, 0, ListView_GetHeader(hListView), (HMENU)ID_CHK_SELECT_ALL, GetModuleHandle(NULL), NULL);
 
             LVCOLUMNW lvc = {0};
             lvc.mask = LVCF_WIDTH | LVCF_SUBITEM | LVCF_TEXT;
@@ -926,7 +926,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                        listW, 
                        (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2, TRUE);
 
-            MoveWindow(hChkSelectAll, g_rcListPanel.left + innerPadding + MulDiv(7, dpi, 96), g_rcListPanel.top + innerPadding + MulDiv(4, dpi, 96), 
+            MoveWindow(hChkSelectAll, MulDiv(7, dpi, 96), MulDiv(5, dpi, 96), 
                        chkColW, MulDiv(16, dpi, 96), TRUE);
                        
             ListView_SetColumnWidth(hListView, 0, chkColW);
@@ -1079,6 +1079,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
