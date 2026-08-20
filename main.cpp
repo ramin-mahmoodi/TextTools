@@ -591,7 +591,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SendMessage(hListView, WM_SETFONT, (WPARAM)hFont, TRUE);
             ListView_SetExtendedListViewStyle(hListView, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
             SetWindowTheme(hListView, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(ListView_GetHeader(hListView), L"DarkMode_ItemsView", NULL);
+            // Removed to prevent theme interfering with custom draw
             ListView_SetBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextBkColor(hListView, RGB(36, 36, 36));
             ListView_SetTextColor(hListView, RGB(240, 240, 240));
@@ -932,7 +932,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                        listW, 
                        (g_rcListPanel.bottom - g_rcListPanel.top) - innerPadding * 2, TRUE);
 
-            MoveWindow(hChkSelectAll, MulDiv(4, dpi, 96), MulDiv(4, dpi, 96), 
+            MoveWindow(hChkSelectAll, MulDiv(3, dpi, 96), MulDiv(4, dpi, 96), 
                        chkColW, MulDiv(16, dpi, 96), TRUE);
                        
             ListView_SetColumnWidth(hListView, 0, chkColW);
@@ -1085,6 +1085,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
 
 
 
