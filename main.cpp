@@ -538,7 +538,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 0, 0, 0, 0, hwnd, (HMENU)ID_EDIT_SPLIT, GetModuleHandle(NULL), NULL);
             SendMessage(hEditSplit, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-            hComboSplitMode = CreateWindowExW(0, WC_COMBOBOXW, L"", WS_TABSTOP | WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | CBS_HASSTRINGS,
+            hComboSplitMode = CreateWindowExW(0, WC_COMBOBOXW, L"", WS_TABSTOP | WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | CBS_OWNERDRAWFIXED | CBS_HASSTRINGS,
                 0, 0, 0, 0, hwnd, (HMENU)ID_COMBO_SPLIT_MODE, GetModuleHandle(NULL), NULL);
             SendMessage(hComboSplitMode, WM_SETFONT, (WPARAM)hFont, TRUE);
             SendMessageW(hComboSplitMode, CB_ADDSTRING, 0, (LPARAM)L"Lines");
@@ -957,6 +957,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
