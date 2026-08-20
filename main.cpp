@@ -571,7 +571,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ListView_InsertColumn(hListView, 1, &lvc);
 
             // Column 2: Size
-            lvc.cx = 80;
+            lvc.cx = 100;
             ListView_InsertColumn(hListView, 2, &lvc);
             
             // Column 3: Lines
@@ -877,7 +877,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             int listW = (g_rcListPanel.right - g_rcListPanel.left) - innerPadding * 2;
             int chkColW = MulDiv(30, dpi, 96);
-            int sizeColW = MulDiv(80, dpi, 96);
+            int sizeColW = MulDiv(100, dpi, 96);
             int linesColW = MulDiv(100, dpi, 96);
             int scrollW = GetSystemMetrics(SM_CXVSCROLL);
             
@@ -885,14 +885,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                        chkColW, staticH, TRUE);
 
             int pathW = listW - chkColW - sizeColW - linesColW - scrollW - MulDiv(4, dpi, 96);
-            MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + MulDiv(2, dpi, 96), g_rcListPanel.top + innerPadding, 
-                       pathW, staticH, TRUE);
+            int txtOffset = MulDiv(6, dpi, 96); // Align static text with ListView subitem padding
+            
+            MoveWindow(hLblHeader, g_rcListPanel.left + innerPadding + chkColW + txtOffset, g_rcListPanel.top + innerPadding, 
+                       pathW - txtOffset, staticH, TRUE);
                        
-            MoveWindow(hLblSize, g_rcListPanel.left + innerPadding + chkColW + pathW, g_rcListPanel.top + innerPadding, 
-                       sizeColW, staticH, TRUE);
+            MoveWindow(hLblSize, g_rcListPanel.left + innerPadding + chkColW + pathW + txtOffset, g_rcListPanel.top + innerPadding, 
+                       sizeColW - txtOffset, staticH, TRUE);
                        
-            MoveWindow(hLblLines, g_rcListPanel.left + innerPadding + chkColW + pathW + sizeColW, g_rcListPanel.top + innerPadding, 
-                       linesColW, staticH, TRUE);
+            MoveWindow(hLblLines, g_rcListPanel.left + innerPadding + chkColW + pathW + sizeColW + txtOffset, g_rcListPanel.top + innerPadding, 
+                       linesColW - txtOffset, staticH, TRUE);
 
             MoveWindow(hListView, g_rcListPanel.left + innerPadding, g_rcListPanel.top + innerPadding + staticH, 
                        listW, 
@@ -1048,6 +1050,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
 
 
 
