@@ -51,36 +51,42 @@ LRESULT CALLBACK ListViewSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
             LPNMCUSTOMDRAW nmcd = (LPNMCUSTOMDRAW)lParam;
             if (nmhdr->hwndFrom == (HWND)SendMessage(hWnd, LVM_GETHEADER, 0, 0)) {
                 if (nmcd->dwDrawStage == CDDS_PREPAINT) {
-                    return CDRF_NOTIFYITEMDRAW;
-                }
-                if (nmcd->dwDrawStage == CDDS_ITEMPREPAINT) {
                     HDC hdc = nmcd->hdc;
-                    RECT rc = nmcd->rc;
+                    RECT rc;
+                    GetClientRect(nmhdr->hwndFrom, &rc);
                     
                     HBRUSH hBrush = CreateSolidBrush(RGB(36, 36, 36));
                     FillRect(hdc, &rc, hBrush);
                     DeleteObject(hBrush);
                     
+                    int count = SendMessage(nmhdr->hwndFrom, HDM_GETITEMCOUNT, 0, 0);
                     HPEN hPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 60));
                     HGDIOBJ hOldPen = SelectObject(hdc, hPen);
-                    MoveToEx(hdc, rc.right - 1, rc.top, NULL);
-                    LineTo(hdc, rc.right - 1, rc.bottom);
+                    SetBkMode(hdc, TRANSPARENT);
+                    SetTextColor(hdc, RGB(240, 240, 240));
+                    
+                    for (int i = 0; i < count; i++) {
+                        RECT itemRc;
+                        SendMessage(nmhdr->hwndFrom, HDM_GETITEMRECT, i, (LPARAM)&itemRc);
+                        
+                        if (i > 0) {
+                            MoveToEx(hdc, itemRc.right - 1, itemRc.top + 4, NULL);
+                            LineTo(hdc, itemRc.right - 1, itemRc.bottom - 4);
+                        }
+                        
+                        wchar_t text[256] = {0};
+                        HDITEMW hdi = {0};
+                        hdi.mask = HDI_TEXT;
+                        hdi.pszText = text;
+                        hdi.cchTextMax = 256;
+                        SendMessage(nmhdr->hwndFrom, HDM_GETITEMW, i, (LPARAM)&hdi);
+                        
+                        RECT textRc = itemRc;
+                        textRc.left += 6;
+                        DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                    }
                     SelectObject(hdc, hOldPen);
                     DeleteObject(hPen);
-                    
-                    wchar_t text[256] = {0};
-                    HDITEMW hdi = {0};
-                    hdi.mask = HDI_TEXT;
-                    hdi.pszText = text;
-                    hdi.cchTextMax = 256;
-                    SendMessage(nmhdr->hwndFrom, HDM_GETITEMW, nmcd->dwItemSpec, (LPARAM)&hdi);
-                    
-                    SetBkMode(hdc, TRANSPARENT);
-                    SetTextColor(hdc, RGB(255, 255, 255));
-                    
-                    RECT textRc = rc;
-                    textRc.left += 6;
-                    DrawTextW(hdc, text, -1, &textRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
                     
                     return CDRF_SKIPDEFAULT;
                 }
@@ -1079,6 +1085,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+
+
 
 
 
